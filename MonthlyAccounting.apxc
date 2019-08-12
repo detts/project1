@@ -109,7 +109,7 @@ public class MonthlyAccounting {
                 when '2024' { someBudget.YearValue__c = 2024; }
                 when '2025' { someBudget.YearValue__c = 2025; }
                 when '2026' { someBudget.YearValue__c = 2026; }
-                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+                when else {	someBudget.addError('Invalid Year picklist value Entered.'); }
             }
         }
     
@@ -127,7 +127,7 @@ public class MonthlyAccounting {
                 when 2024 { someBudget.YearBudgeted__c = '2024'; }
                 when 2025 { someBudget.YearBudgeted__c = '2025'; }
                 when 2026 { someBudget.YearBudgeted__c = '2026'; }
-                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+                when else {	someBudget.addError('Invalid Year entered in transaction.'); }
             }
         }
     
@@ -148,7 +148,7 @@ public class MonthlyAccounting {
                 when 10  { someBudget.Budgeted_Month__c = 'October'; }
                 when 11 { someBudget.Budgeted_Month__c = 'November'; }
                 when 12 { someBudget.Budgeted_Month__c = 'December'; }
-                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+                when else {	someBudget.addError('Invalid Month Entered in Transaction.'); }
 			}
         }
     

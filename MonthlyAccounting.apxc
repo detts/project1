@@ -1,0 +1,175 @@
+public class MonthlyAccounting {
+
+    	public static void accountForNewMonth(List<Monthly_Budget__c> newMonthlyBudgets)
+        {
+            Id userId = userInfo.getUserId();
+            //gets list of budgets currently in the database.
+            List<Monthly_Budget__c> currentBudgets = new List<Monthly_Budget__c>([SELECT Budgeted_Month__c, YearBudgeted__c, YearValue__c, Month_Value__c, RecordedIncome__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
+            //Takes in a list of monthly budgets, then checks if they already exist (same year/month as well as expense type).
+            //
+            //
+            List<Income_Transaction__c> relatedTransactions = new List<Income_Transaction__c>();
+            
+            
+            System.debug('newMonthlyBudgets: ' + newMonthlyBudgets);
+            for(Monthly_Budget__c someBudget : newMonthlyBudgets)
+            {
+                relatedTransactions.clear();
+                //Ensures that both year and month picklist & number values exist in any particular Budget.
+                if( ((someBudget.YearValue__c == null) || (someBudget.Month_Value__c == null)) || ((someBudget.YearBudgeted__c == null) || (someBudget.Budgeted_Month__c == null)) )
+                {
+                   
+                    if( (someBudget.YearBudgeted__c != null) && (someBudget.Budgeted_Month__c != null) )
+                    {
+                        setYearValueFromYearPicklist(someBudget);
+                        setMonthValueFromPicklistString(someBudget);
+                    }
+                    if( (someBudget.YearValue__c != null) && (someBudget.Month_Value__c != null) )
+                    {
+                        setYearStringOnPicklistFromYearValue(someBudget);
+                    	setMonthStringOnPicklistFromMonthValue(someBudget);
+                    }
+                }//Checks the same if statement again, seeing if all month and year values have been filled.
+                if( ((someBudget.YearValue__c == null) || (someBudget.Month_Value__c == null)) || ((someBudget.YearBudgeted__c == null) || (someBudget.Budgeted_Month__c == null)) )
+                {
+                    someBudget.addError('A Month or year value wes not chosen before trying to create the Budget.'); 
+                }
+                
+                
+                //Ensures there is a value for the expense being budgeted.  (All existing expenses for composite type, which is default.)
+                if(someBudget.budgetedExpense__c == null)
+                {
+                    someBudget.budgetedExpense__c = 'Composite';
+                }
+                
+                //Ensures a name exists for the Budget, by default it will create a name based on the existing year-month and budgetedexpense values.
+                if(someBudget.Name == null || someBudget.Name == '')
+                {
+                    someBudget.Name = someBudget.budgetedExpense__c + ' budget of ' + someBudget.Budgeted_Month__c + ' ' + someBudget.YearBudgeted__c;
+                }
+                
+                //MANAGES DIFFERENCES BETWEEN CREATION OF A 'COMPOSITE' AND A 'SUBORDINATE' BUDGET!
+                if(someBudget.budgetedExpense__c != 'Composite')
+                {
+                    boolean compositeFound = false;
+                    for(Monthly_Budget__c curBudget : currentBudgets)
+                    {
+                        //checks if the current Budget is this subordinate budget's Composite Budget.
+                        if( (curBudget.Budgeted_Month__c == someBudget.Budgeted_Month__c) && (curBudget.YearBudgeted__c == someBudget.YearBudgeted__c) && (someBudget.budgetedExpense__c == 'Composite') )
+                        {
+                            someBudget.CompositeBudget__c = curBudget.Id;
+                            compositeFound = true;
+                        }
+                    }
+                    //If no composite exists for the subordinate budget, create one.
+                    if(!compositeFound)
+                    {
+                        Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
+                        instantMonthlyBudget.YearValue__c = someBudget.YearValue__c;
+                        instantMonthlyBudget.Month_Value__c = someBudget.Month_Value__c;
+                        instantMonthlyBudget.budgetedExpense__c = 'composite';
+                        instantMonthlyBudget.OwnerId = userInfo.getUserId();
+                        instantMonthlyBudget.RecordedIncome__c = 0;
+                        someBudget.CompositeBudget__c = instantMonthlyBudget.id;
+                        newMonthlyBudgets.add(instantMonthlyBudget); // can't direcctly affect parameters - create a local copy and affect that
+                    }
+                }
+               
+            } 
+
+        }
+    
+    	private static void setYearValueFromYearPicklist(Monthly_Budget__c someBudget)
+        {
+            String yearString = someBudget.YearBudgeted__c;
+            switch on yearString
+            {
+                when '2018' { someBudget.YearValue__c = 2018; }	
+                when '2019' { someBudget.YearValue__c = 2019; }
+                when '2020' { someBudget.YearValue__c = 2020; }
+                when '2021' { someBudget.YearValue__c = 2021; }
+                when '2022' { someBudget.YearValue__c = 2022; }
+                when '2023' { someBudget.YearValue__c = 2023; }
+                when '2024' { someBudget.YearValue__c = 2024; }
+                when '2025' { someBudget.YearValue__c = 2025; }
+                when '2026' { someBudget.YearValue__c = 2026; }
+                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+            }
+        }
+    
+    	private static void setYearStringOnPicklistFromYearValue(Monthly_Budget__c someBudget)
+        {
+            Integer yearValue = (Integer)someBudget.YearValue__c;
+            switch on yearValue
+            {
+                when 2018 { someBudget.YearBudgeted__c = '2018'; }	
+                when 2019 { someBudget.YearBudgeted__c = '2019'; }
+                when 2020 { someBudget.YearBudgeted__c = '2020'; }
+                when 2021 { someBudget.YearBudgeted__c = '2021'; }
+                when 2022 { someBudget.YearBudgeted__c = '2022'; }
+                when 2023 { someBudget.YearBudgeted__c = '2023'; }
+                when 2024 { someBudget.YearBudgeted__c = '2024'; }
+                when 2025 { someBudget.YearBudgeted__c = '2025'; }
+                when 2026 { someBudget.YearBudgeted__c = '2026'; }
+                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+            }
+        }
+    
+    	private static void setMonthStringOnPicklistFromMonthValue(Monthly_Budget__c someBudget)
+        {
+            Integer monthValue = (Integer)someBudget.Month_Value__c;
+            switch on monthValue 
+            {
+                when 1 { someBudget.Budgeted_Month__c = 'January'; }	
+                when 2 { someBudget.Budgeted_Month__c = 'February'; }
+                when 3 { someBudget.Budgeted_Month__c = 'March'; }
+                when 4 { someBudget.Budgeted_Month__c = 'April'; }
+                when 5 { someBudget.Budgeted_Month__c = 'May'; }
+                when 6 { someBudget.Budgeted_Month__c = 'June'; }
+                when 7 { someBudget.Budgeted_Month__c = 'July'; }
+                when 8 { someBudget.Budgeted_Month__c = 'August'; }
+                when 9 { someBudget.Budgeted_Month__c = 'September'; }
+                when 10  { someBudget.Budgeted_Month__c = 'October'; }
+                when 11 { someBudget.Budgeted_Month__c = 'November'; }
+                when 12 { someBudget.Budgeted_Month__c = 'December'; }
+                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+			}
+        }
+    
+    	private static void setMonthValueFromPicklistString(Monthly_Budget__c someBudget)
+        {
+            String monthString = someBudget.Budgeted_Month__c;
+            
+            switch on monthString 
+            {
+                when 'January' { someBudget.Month_Value__c = 1; }	
+                when 'February' { someBudget.Month_Value__c = 2; }
+                when 'March' { someBudget.Month_Value__c = 3; }
+                when 'April' { someBudget.Month_Value__c = 4; }
+                when 'May' { someBudget.Month_Value__c = 5; }
+                when 'June' { someBudget.Month_Value__c = 6; }
+                when 'July' { someBudget.Month_Value__c = 7; }
+                when 'August' { someBudget.Month_Value__c = 8; }
+                when 'September' { someBudget.Month_Value__c = 9; }
+                when 'October'  { someBudget.Month_Value__c = 10; }
+                when 'November' { someBudget.Month_Value__c = 11; }
+                when 'December' { someBudget.Month_Value__c = 12; }
+                when else {	someBudget.addError('Invalid Month picklist value Entered.'); }
+			}
+        }
+    
+    	public static void accountForUpdatingMonthlyBudgets(List<Monthly_Budget__c> updatingMonthlyBudgets)
+        {
+            //for each update on composite monthly budget, update income on all subordinate 'expense' budgets.
+            //
+            //for each update on an 'expense' budget, update expenses on composite monthly budget.
+        }
+    
+    	public static void accountForDeletingMonthlyBudgets(List<Monthly_Budget__c> MonthlyBudgetToBeDeleted)
+        {
+            //If a composite monthly budget is deleted, delete all subordinate 'expense' budgets first, then all related Income Transactions.
+            //
+            //If a 'expense' budget is deleted, increment to composite for each expense transaction, then delete all related expense transactions.
+        }
+    
+}

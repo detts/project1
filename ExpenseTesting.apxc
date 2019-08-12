@@ -1,0 +1,43 @@
+@isTest
+public class ExpenseTesting {
+    
+    @testSetup
+	public static void ExpenseTestSetup()
+    {
+		//
+		List<Monthly_Budget__c> testBudgets = new List<Monthly_Budget__c>();
+        //
+		List<Expense_Transaction__c> testExpenses = new List<Expense_Transaction__c>();
+        //
+        Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
+        instantMonthlyBudget.YearValue__c = 2020;
+        instantMonthlyBudget.Month_Value__c = 6;
+        instantMonthlyBudget.budgetedExpense__c = 'Composite';
+        instantMonthlyBudget.OwnerId = userInfo.getUserId();
+        instantMonthlyBudget.Recorded_Expenses__c = 0;
+        //
+        Monthly_Budget__c instantSubMonthlyBudget = new Monthly_Budget__c();
+        instantSubMonthlyBudget.YearValue__c = 2020;
+        instantSubMonthlyBudget.Month_Value__c = 6;
+        instantSubMonthlyBudget.budgetedExpense__c = 'Composite';
+        instantSubMonthlyBudget.OwnerId = userInfo.getUserId();
+        instantSubMonthlyBudget.Recorded_Expenses__c = 0;
+        //
+        testBudgets.add(instantMonthlyBudget);
+        testBudgets.add(instantSubMonthlyBudget);
+        //Creates a expense transaction that should match and lookup to the Subordinate Budget 'instantSubMonthlyBudget' defined above.
+        Expense_Transaction__c matchingTransaction = new Expense_Transaction__c();
+        matchingTransaction.TransactionDate__c = Date.newInstance(2020, 06, 06);
+        matchingTransaction.YearValue__c = 2020;
+        matchingTransaction.MonthValue__c = 6;
+        matchingTransaction.Expense_Types__c = '';
+        matchingTransaction.ExpenseAmount__c = 25.60;
+        //Creates a expense transaction that should match with an undefined budget, causing that budget to be subsequently created.Expense_Transaction__c matchingTransaction = new Expense_Transaction__c();
+        Expense_Transaction__c unmatchedTransaction = new Expense_Transaction__c();
+        unmatchedTransaction.TransactionDate__c = Date.newInstance(2020, 06, 06);
+        unmatchedTransaction.YearValue__c = 2020;
+        unmatchedTransaction.MonthValue__c = 6;
+        unmatchedTransaction.Expense_Types__c = '';
+        unmatchedTransaction.ExpenseAmount__c = 23.40;
+    }
+}

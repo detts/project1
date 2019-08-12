@@ -84,9 +84,17 @@ public class MonthlyBudgetTesting {
         duplicateBudget.OwnerId = userInfo.getUserId();
         duplicateBudget.Recorded_Expenses__c = 0;
         //
+        Monthly_Budget__c duplicateBudgetTwo = new Monthly_Budget__c();
+        duplicateBudgetTwo.YearValue__c = 2020;
+        duplicateBudgetTwo.Month_Value__c = 6;
+        duplicateBudgetTwo.budgetedExpense__c = 'Composite';
+        duplicateBudgetTwo.OwnerId = userInfo.getUserId();
+        duplicateBudgetTwo.Recorded_Expenses__c = 0;
+        //
         invalidBudgets.add(outOfBoundsDateBudget);
         invalidBudgets.add(UserOutOfBoundsDateBudget);
         invalidBudgets.add(duplicateBudget);
+        invalidBudgets.add(duplicateBudgetTwo);
     }
     
     @isTest
@@ -98,7 +106,7 @@ public class MonthlyBudgetTesting {
         {
             isolatedValidBudgets.clear();
             isolatedValidBudgets.add(validBudgets[i]);
-            MonthlyAccounting.accountForNewMonth(isolatedValidBudgets);
+            insert isolatedValidBudgets;
             switch on i
             {
                 when 0 { System.assert( true ); }
@@ -122,16 +130,17 @@ public class MonthlyBudgetTesting {
             isolatedInvalidBudgets.add(invalidBudgets[i]);
             SYstem.debug('invalid budget: ' + invalidBudgets[i]);
             try{
-                MonthlyAccounting.accountForNewMonth(isolatedInvalidBudgets);
+                insert isolatedInvalidBudgets;
             }catch(exception e)
             {
                 System.debug('Found error "'+ e.getMessage() + '" at line ' + e.getLineNumber() + '.');
                 switch on i
                 {
-                    when 0 { System.assert( 'm'.equals( e.getMessage() ) ); }
-                    when 1 { System.assert( 'k'.equals( e.getMessage() ) ); }
-                    when 2 { System.assert( 'i'.equals( e.getMessage() ) ); }
-                    when 3 { System.assert( 'j'.equals( e.getMessage() ) ); }
+                    when 0 { System.assert( 'A Month or year value wes not chosen before trying to create the Budget.'.equals( e.getMessage() ) ); }
+                    when 1 { System.assert( 'Year or month values entered were invalid, please enter year between 2018-2026, and enter a real month 1-12.'.equals( e.getMessage() ) ); }
+                    when 2 { System.assert( 'Year or month values entered were invalid, please enter year between 2018-2026, and enter a real month 1-12.'.equals( e.getMessage() ) ); }
+                    when 3 { /*Nothing asserted here because it is a valid entry */ }
+                    when 4 { System.assert( 'This budget already exists.'.equals( e.getMessage() ) ); }
                 }
             }
         }

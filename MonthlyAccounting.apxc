@@ -8,6 +8,7 @@ public class MonthlyAccounting {
             //Takes in a list of monthly budgets, then checks if they already exist (same year/month as well as expense type).
             //
             //
+            List<Monthly_Budget__c> autoBudgets = new List<Monthly_Budget__c>();
             List<Income_Transaction__c> relatedTransactions = new List<Income_Transaction__c>();
             
             
@@ -35,11 +36,26 @@ public class MonthlyAccounting {
                     someBudget.addError('A Month or year value wes not chosen before trying to create the Budget.'); 
                 }
                 
+                //After ensuring year/month values should be filled, checks if they are valid.
+                if( (someBudget.YearValue__c <= 2017) || (someBudget.Month_Value__c <= 0) || (someBudget.YearValue__c >= 2027) || (someBudget.Month_Value__c >= 13))
+                {
+                    someBudget.addError('Year or month values entered were invalid, please enter year between 2018-2026, and enter a real month 1-12.');
+                }
                 
                 //Ensures there is a value for the expense being budgeted.  (All existing expenses for composite type, which is default.)
                 if(someBudget.budgetedExpense__c == null)
                 {
                     someBudget.budgetedExpense__c = 'Composite';
+                }
+
+                //After having all necessary fields filled for the check, compare with previously defined budgets to see if there is a duplicate.
+                for(integer i = 0; i < currentBudgets.Size(); i++)
+                {
+                    if( (currentBudgets[i].budgetedExpense__c == someBudget.budgetedExpense__c) && (currentBudgets[i].YearValue__c == someBudget.YearValue__c) && (currentBudgets[i].Month_Value__c == someBudget.YearValue__c) )
+                    {
+                        //then this is a duplicate budget, so throw error on this Budget.
+                        someBudget.addError('This budget already exists.');
+                    }
                 }
                 
                 //Ensures a name exists for the Budget, by default it will create a name based on the existing year-month and budgetedexpense values.
@@ -71,12 +87,12 @@ public class MonthlyAccounting {
                         instantMonthlyBudget.OwnerId = userInfo.getUserId();
                         instantMonthlyBudget.RecordedIncome__c = 0;
                         someBudget.CompositeBudget__c = instantMonthlyBudget.id;
-                        newMonthlyBudgets.add(instantMonthlyBudget); // can't direcctly affect parameters - create a local copy and affect that
+                        autoBudgets.add(instantMonthlyBudget); // can't direcctly affect parameters - create a local copy and affect that
                     }
                 }
                
             } 
-
+			insert autoBudgets;
         }
     
     	private static void setYearValueFromYearPicklist(Monthly_Budget__c someBudget)

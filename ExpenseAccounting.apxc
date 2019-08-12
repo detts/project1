@@ -1,0 +1,154 @@
+public class ExpenseAccounting {
+
+    	public static void accountForNewExpenses(List<Expense_Transaction__c> newExpenseTransactions)
+        {
+            Id userId = userInfo.getUserId();
+            List<Monthly_Budget__c> Budgets = new List<Monthly_Budget__c>([SELECT Budgeted_Month__c, YearBudgeted__c, YearValue__c, Month_Value__c, Recorded_Expenses__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
+            //used to track through loop and gather all year-month matches found for a particular Transaction.
+            List<Monthly_Budget__c> matchedBudgets = new List<Monthly_Budget__c>();
+            //Iterates through all new Income statements, making sure each income statement, if valid, has a composite Monthly Budget lookup.
+            //Then, it updates that transactions composite monthly budget.
+            
+            for( Expense_Transaction__c someExpense : newExpenseTransactions )
+            {
+                
+                //clears the matchedBudgets List, readying it so it may be filled for this iteration's new Expense Transaction.
+                matchedBudgets.clear();
+                	//set the year and month values based on the date entered (these values are not shown to user).
+                    someExpense.YearValue__c = someExpense.TransactionDate__c.Year();
+                    someExpense.MonthValue__c = someExpense.TransactionDate__c.Month();
+                
+                	//Checks that entered date is valid to use with a Budget, throws an error on IncomeTransaction if it is not.
+                    if(someExpense.YearValue__c >= 2018 && someExpense.YearValue__c <= 2026)
+                    {
+                        //Ensures that for a single transaction, every Budget is iterated through and checked for a match.
+                        for(Integer iter = 0; iter < Budgets.size(); iter++)
+                        {
+                            //Checks if budget is a match, budgets with matching year-month pairs are added onto a list of budgets that match the current Income transaction.
+                            if( (someExpense.YearValue__c == Budgets[iter].YearValue__c) && (someExpense.MonthValue__c == Budgets[iter].Month_Value__c) )
+                            {
+                                	matchedBudgets.add(Budgets[iter]);
+                            }
+                        }
+                        
+                        if( matchedBudgets.Size() == 0 )  //Checks if the budgeted month was not found/does not exist.  Creates a default composite budget if no budget exists.
+                        {
+                                Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
+                                instantMonthlyBudget.YearValue__c = someExpense.YearValue__c;
+                                instantMonthlyBudget.Month_Value__c = someExpense.MonthValue__c;
+                            	instantMonthlyBudget.budgetedExpense__c = 'Composite';
+                                instantMonthlyBudget.OwnerId = userInfo.getUserId();
+                            	instantMonthlyBudget.Recorded_Expenses__c = 0;
+                                Budgets.add(instantMonthlyBudget);
+                            
+                            	Monthly_Budget__c instantSubBudget = new Monthly_Budget__c();
+                            	instantSubBudget.CompositeBudget__c = instantMonthlyBudget.id;
+                                instantSubBudget.YearValue__c = someExpense.YearValue__c;
+                                instantSubBudget.Month_Value__c = someExpense.MonthValue__c;
+                            	instantSubBudget.budgetedExpense__c = someExpense.Expense_Types__c;
+                                instantSubBudget.OwnerId = userInfo.getUserId();
+                            	instantSubBudget.Recorded_Expenses__c = 0;
+                                establishTransactionAndBudgetLookup(someExpense, instantSubBudget);
+                                Budgets.add(instantSubBudget);
+                        }
+                        else //Looks through the matched budgets to find it's pre-existing Composite Budget.
+                        {    //Then establishes an expense lookup to the subordinate Budget, as well as a lookup from the sub to the composite.
+                            for(Monthly_Budget__c compositeBudget : matchedBudgets)
+                            {
+                                if(compositeBudget.budgetedExpense__c == 'Composite')
+                                {
+                                    Boolean foundSubBudget = false;
+                                    for(Monthly_Budget__c subBudget : matchedBudgets)
+                            		{
+                                        if(subBudget.budgetedExpense__c == someExpense.Expense_Types__c)
+                                        {
+                                            establishTransactionAndBudgetLookup(someExpense, subBudget);
+                                            subBudget.CompositeBudget__c = compositeBudget.Id;
+                                            foundSubBudget = true;
+                                            //breaks out of the loop for finding the subordinate expense budget.
+                                            //break;
+                                        }
+                                    }
+                                    //Accounts for case where Composite exists but not the subordinate budget.
+                                    if(!foundSubBudget)
+                                    {
+                                        Monthly_Budget__c instantSubBudget = new Monthly_Budget__c();
+                                        instantSubBudget.CompositeBudget__c = compositeBudget.id;                                      
+                                        instantSubBudget.YearValue__c = compositeBudget.YearValue__c;
+                                		instantSubBudget.Month_Value__c = compositeBudget.Month_Value__c;
+                                        instantSubBudget.budgetedExpense__c = someExpense.Expense_Types__c;
+                                        instantSubBudget.OwnerId = userInfo.getUserId();
+                                        instantSubBudget.Recorded_Expenses__c = 0;
+                                        establishTransactionAndBudgetLookup(someExpense, instantSubBudget);
+                                        Budgets.add(instantSubBudget);
+                                    }
+                                    //breaks out of loop for locating the composite budget.
+                                    //break;
+                                }
+                            }
+                        }
+                    }
+                	else
+                    {
+                        someExpense.addError('Invalid date entry, must be a date in or between the years 2018-2026.');
+                    }
+                	
+                	//Checks all matching Budgets, and if they match the expense type or are the composite budget, then that expense is put into the Recorded Expenses field.
+                	for(Integer iter = 0; iter < matchedBudgets.Size(); iter++)
+                    {
+                        if(matchedBudgets[iter].budgetedExpense__c == 'Composite' || matchedBudgets[iter].budgetedExpense__c == someExpense.Expense_Types__c)
+                        {
+                            //Checks to see if the Income Amount is positive and fits within the ranges given for the field.
+                            //Updates the Recorded Income field in the related monthly budget (which should be created/connected at this point)
+                            if(someExpense.ExpenseAmount__c >= 0.00 && someExpense.ExpenseAmount__c <= 999999999.99)
+                            {
+                                matchedBudgets[iter].Recorded_Expenses__c = ( matchedBudgets[iter].Recorded_Expenses__c + someExpense.ExpenseAmount__c);
+                            }
+                            else
+                            {
+                                someExpense.addError('Invalid Expense Amount Entry, must be an Expense value in range $0.00 - $999999999.99');
+                            }
+                        }
+                    }
+            }
+            upsert Budgets;
+        }
+    
+    	private static void establishTransactionAndBudgetLookup(Expense_Transaction__c someExpense, Monthly_Budget__c someBudget)
+        {
+            //Checks to make sure the Income Transaction does not already have the reference to the Monthly Budget's address before assigning it.
+            if(!(someExpense.Related_Monthly_Budget__c == someBudget.id))
+            {
+                someExpense.Related_Monthly_Budget__c = someBudget.id;
+            }
+        }
+    
+    	public static void accountForUpdatedExpenses(List<Expense_Transaction__c> previousExpenseTransactions, List<Expense_Transaction__c> updatingExpenseTransactions)
+        {
+            for(Expense_Transaction__c someExpense : updatingExpenseTransactions)
+            {
+                for(Expense_Transaction__c oldExpense : previousExpenseTransactions)
+                {
+                    //Catches all matching old and new values, and accounts for their changes here.
+                    if(oldExpense.id == someExpense.id)
+                    {
+                        //
+                        if(oldExpense.ExpenseAmount__c > someExpense.ExpenseAmount__c)
+                        {
+                            
+                        }
+                        else if(oldExpense.ExpenseAmount__c < someExpense.ExpenseAmount__c)
+                        {
+                            
+                        }
+                    }
+                }
+            }
+        }
+    
+    	public static void accountForDeletedExpenseTransactions(List<Income_Transaction__c> ExpenseTransactionsToBeDeleted)
+        {
+            
+        }
+    
+}

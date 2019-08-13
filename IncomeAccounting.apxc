@@ -3,7 +3,7 @@ public class IncomeAccounting {
     	public static void accountForNewIncome(List<Income_Transaction__c> newIncomeTransactions)
         {
             Id userId = userInfo.getUserId();
-            List<Monthly_Budget__c> Budgets = new List<Monthly_Budget__c>([SELECT YearValue__c, Month_Value__c, RecordedIncome__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
+            List<Monthly_Budget__c> Budgets = new List<Monthly_Budget__c>([SELECT YearValue__c, Month_Value__c, RecordedIncome__c, Recorded_Expenses__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
             //used to track through loop and gather all year-month matches found for a particular Transaction.
             List<Monthly_Budget__c> matchedBudgets = new List<Monthly_Budget__c>();
             //Iterates through all new Income statements, making sure each income statement, if valid, has a composite Monthly Budget lookup.
@@ -43,8 +43,12 @@ public class IncomeAccounting {
                                 instantMonthlyBudget.YearValue__c = someIncome.YearValue__c;
                                 instantMonthlyBudget.Month_Value__c = someIncome.MonthValue__c;
                             	instantMonthlyBudget.budgetedExpense__c = 'Composite';
+                            	MonthlyAccounting.setYearStringOnPicklistFromYearValue(instantMonthlyBudget);
+                    			MonthlyAccounting.setMonthStringOnPicklistFromMonthValue(instantMonthlyBudget);
                                 instantMonthlyBudget.OwnerId = userInfo.getUserId();
-                            	instantMonthlyBudget.RecordedIncome__c = 0;
+                            	instantMonthlyBudget.RecordedIncome__c = someIncome.Income_Amount__c;
+                            	instantMonthlyBudget.Recorded_Expenses__c = 0;
+                            	instantMonthlyBudget.Name = instantMonthlyBudget.budgetedExpense__c + ' budget of ' + instantMonthlyBudget.Budgeted_Month__c + ' ' + instantMonthlyBudget.YearBudgeted__c;
                                 establishTransactionAndBudgetLookup(someIncome, instantMonthlyBudget);
                                 Budgets.add(instantMonthlyBudget);
                         }
@@ -55,6 +59,7 @@ public class IncomeAccounting {
                                 if(transactionBudget.budgetedExpense__c == 'Composite')
                                 {
                                     establishTransactionAndBudgetLookup(someIncome, transactionBudget);
+                                    transactionBudget.RecordedIncome__c += someIncome.Income_Amount__c;
                                 }
                             }
                         }
@@ -73,6 +78,8 @@ public class IncomeAccounting {
                             if(someIncome.Income_Amount__c >= 0.00 && someIncome.Income_Amount__c <= 999999999.99)
                             {
                                 matchedBudgets[iter].RecordedIncome__c = ( matchedBudgets[iter].RecordedIncome__c + someIncome.Income_Amount__c);
+                                establishTransactionAndBudgetLookup(someIncome, matchedBudgets[iter]);
+                                
                             }
                             else
                             {
@@ -84,6 +91,23 @@ public class IncomeAccounting {
             //Take the list of Budgets(which may or may not have had a new Budget created and added to them) and update/insert them into the database.
             upsert Budgets;
         }
+    
+    	public static void accountForAutoBudgetLookups(List<Income_Transaction__c> newIncomeTransactions)
+        {
+			Id userId = userInfo.getUserId();
+            List<Monthly_Budget__c> compBudgets = new List<Monthly_Budget__c>([SELECT id, YearValue__c, Month_Value__c, RecordedIncome__c, Recorded_Expenses__c, budgetedExpense__c, OwnerId FROM Monthly_Budget__c WHERE ownerId =: userId AND budgetedExpense__c='Composite']);
+            for(Income_Transaction__c someIncome : newIncomeTransactions)
+            {
+                for(Monthly_Budget__c compBudget : compBudgets)
+            	{
+                    if(someIncome.MonthValue__c == compBudget.Month_Value__c && someIncome.YearValue__c == compBudget.YearValue__c && someIncome.Monthly_Budget__c == null)
+                    {
+                        establishTransactionAndBudgetLookup(someIncome, compBudget);
+                    }
+            	}
+            }
+            
+        }
     	
         private static void establishTransactionAndBudgetLookup(Income_Transaction__c someIncome, Monthly_Budget__c someBudget)
         {
@@ -94,11 +118,11 @@ public class IncomeAccounting {
             }
         }
     
-    	public static void accountForChangedTransactions(List<Income_Transaction__c> updatingIncomeTransactions)
+    	public static void accountForChangedTransactions(List<Income_Transaction__c> oldIncomeTransactions, List<Income_Transaction__c> updatingIncomeTransactions)
         {
-            Id userId = userInfo.getUserId();
             //Retrieves the Ids of all Income Transactions owned by running user which are already in the database.
-            List<Income_Transaction__c> oldIncomeTransactions = [SELECT Id FROM Income_Transaction__c WHERE ownerId =: userId];
+            Id userId = userInfo.getUserId();
+            List<Monthly_Budget__c> relatedBudgets = new List<Monthly_Budget__c>([SELECT RecordedIncome__c, YearValue__c, Month_Value__c FROM Monthly_Budget__c WHERE ownerId =: userId]);
             for(Integer iter = 0; iter < updatingIncomeTransactions.Size(); iter++)
             {
                 for(Integer innerIter = 0; innerIter < oldIncomeTransactions.Size(); innerIter++)
@@ -106,34 +130,43 @@ public class IncomeAccounting {
                     //ensures that the updating transaction is the same transaction as the old one.
                     if(updatingIncomeTransactions[iter].id == oldIncomeTransactions[iter].id)
                     {
-                        //If the Income Recieved date is being updated, populate the Month and Year values accordingly.
-                        if( !(updatingIncomeTransactions[iter].IncomeRecievedDate__c == oldIncomeTransactions[innerIter].IncomeRecievedDate__c) )
-                        {
-                            updatingIncomeTransactions[iter].MonthValue__c = updatingIncomeTransactions[innerIter].IncomeRecievedDate__c.Month();
-                            updatingIncomeTransactions[iter].YearValue__c = updatingIncomeTransactions[innerIter].IncomeRecievedDate__c.Year();
-                        }
-                        //If the Income Source Type is being updated, refresh the fields related to it in the Monthly Budget.
-                        if( !(updatingIncomeTransactions[iter].IncomeSource__c == oldIncomeTransactions[innerIter].IncomeSource__c) )
-                        {
-                            
-                        }
                         //If the Income Amount is being updated, refresh the fields related to it in the Monthly Budget.
                         if( !(updatingIncomeTransactions[iter].Income_Amount__c == oldIncomeTransactions[innerIter].Income_Amount__c) )
                         {
-                            
+                            Double diff = (updatingIncomeTransactions[iter].Income_Amount__c - oldIncomeTransactions[innerIter].Income_Amount__c);
+                            for(Monthly_Budget__c someBudget : relatedBudgets)
+                            {
+                                if(updatingIncomeTransactions[iter].YearValue__c == someBudget.YearValue__c && updatingIncomeTransactions[iter].MonthValue__c == someBudget.Month_Value__c)
+                                {
+                                   //Accounts for the difference between the old and new amount within the composite budget.
+                                   someBudget.RecordedIncome__c += diff;
+                                }
+                            }
                         }
-                        
                     }
             	}	
             }
+            update relatedBudgets;
         }
     
     	public static void accountForDeletedIncomeTransactions(List<Income_Transaction__c> IncomeTransactionsToBeDeleted)
         {
+            Id userId = userInfo.getUserId();
+            List<Monthly_Budget__c> relatedBudgets = new List<Monthly_Budget__c>([SELECT RecordedIncome__c, YearValue__c, Month_Value__c, budgetedExpense__c FROM Monthly_Budget__c WHERE ownerId =: userId]);
             for(Income_Transaction__c someIncome : IncomeTransactionsToBeDeleted)
             {
-                
+                  for(Monthly_Budget__c someBudget : relatedBudgets)
+                  {
+                     //Evaluates true only for the budget it is related to.
+                     if(someBudget.budgetedExpense__c == 'Composite' && someIncome.YearValue__c == someBudget.YearValue__c && someIncome.MonthValue__c == someBudget.Month_Value__c)
+                     {
+                        //Accounts for the loss of the old income within it's composite budget.
+                        someBudget.RecordedIncome__c -= someIncome.Income_Amount__c;
+                      }
+                  }
             }
+            
+            update relatedBudgets;
         }
  	
 }

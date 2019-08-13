@@ -4,15 +4,13 @@ public class MonthlyAccounting {
         {
             Id userId = userInfo.getUserId();
             //gets list of budgets currently in the database.
-            List<Monthly_Budget__c> currentBudgets = new List<Monthly_Budget__c>([SELECT Budgeted_Month__c, YearBudgeted__c, YearValue__c, Month_Value__c, RecordedIncome__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
+            List<Monthly_Budget__c> currentBudgets = new List<Monthly_Budget__c>([SELECT Budgeted_Month__c, YearBudgeted__c, YearValue__c, Month_Value__c, RecordedIncome__c, Recorded_Expenses__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c WHERE ownerId =: userId]);
             //Takes in a list of monthly budgets, then checks if they already exist (same year/month as well as expense type).
             //
             //
             List<Monthly_Budget__c> autoBudgets = new List<Monthly_Budget__c>();
             List<Income_Transaction__c> relatedTransactions = new List<Income_Transaction__c>();
-            
-            
-            System.debug('newMonthlyBudgets: ' + newMonthlyBudgets);
+
             for(Monthly_Budget__c someBudget : newMonthlyBudgets)
             {
                 relatedTransactions.clear();
@@ -58,12 +56,6 @@ public class MonthlyAccounting {
                     }
                 }
                 
-                //Ensures a name exists for the Budget, by default it will create a name based on the existing year-month and budgetedexpense values.
-                if(someBudget.Name == null || someBudget.Name == '')
-                {
-                    someBudget.Name = someBudget.budgetedExpense__c + ' budget of ' + someBudget.Budgeted_Month__c + ' ' + someBudget.YearBudgeted__c;
-                }
-                
                 //MANAGES DIFFERENCES BETWEEN CREATION OF A 'COMPOSITE' AND A 'SUBORDINATE' BUDGET!
                 if(someBudget.budgetedExpense__c != 'Composite')
                 {
@@ -83,19 +75,26 @@ public class MonthlyAccounting {
                         Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
                         instantMonthlyBudget.YearValue__c = someBudget.YearValue__c;
                         instantMonthlyBudget.Month_Value__c = someBudget.Month_Value__c;
+                        setYearStringOnPicklistFromYearValue(someBudget);
+                    	setMonthStringOnPicklistFromMonthValue(someBudget);
                         instantMonthlyBudget.budgetedExpense__c = 'Composite';
                         instantMonthlyBudget.OwnerId = userInfo.getUserId();
                         instantMonthlyBudget.RecordedIncome__c = 0;
+                        instantMonthlyBudget.Name = someBudget.budgetedExpense__c + ' budget of ' + someBudget.Budgeted_Month__c + ' ' + someBudget.YearBudgeted__c;
                         someBudget.CompositeBudget__c = instantMonthlyBudget.id;
                         autoBudgets.add(instantMonthlyBudget); // can't direcctly affect parameters - create a local copy and affect that
                     }
                 }
-               
+                //Ensures a name exists for the Budget, by default it will create a name based on the existing year-month and budgetedexpense values.
+                if(someBudget.Name == null || someBudget.Name == '')
+                {
+                    someBudget.Name = someBudget.budgetedExpense__c + ' budget of ' + someBudget.Budgeted_Month__c + ' ' + someBudget.YearBudgeted__c;
+                }
             } 
 			insert autoBudgets;
         }
     
-    	private static void setYearValueFromYearPicklist(Monthly_Budget__c someBudget)
+    	public static void setYearValueFromYearPicklist(Monthly_Budget__c someBudget)
         {
             String yearString = someBudget.YearBudgeted__c;
             switch on yearString
@@ -113,7 +112,7 @@ public class MonthlyAccounting {
             }
         }
     
-    	private static void setYearStringOnPicklistFromYearValue(Monthly_Budget__c someBudget)
+    	public static void setYearStringOnPicklistFromYearValue(Monthly_Budget__c someBudget)
         {
             Integer yearValue = (Integer)someBudget.YearValue__c;
             switch on yearValue
@@ -131,7 +130,7 @@ public class MonthlyAccounting {
             }
         }
     
-    	private static void setMonthStringOnPicklistFromMonthValue(Monthly_Budget__c someBudget)
+    	public static void setMonthStringOnPicklistFromMonthValue(Monthly_Budget__c someBudget)
         {
             Integer monthValue = (Integer)someBudget.Month_Value__c;
             switch on monthValue 
@@ -152,7 +151,7 @@ public class MonthlyAccounting {
 			}
         }
     
-    	private static void setMonthValueFromPicklistString(Monthly_Budget__c someBudget)
+    	public static void setMonthValueFromPicklistString(Monthly_Budget__c someBudget)
         {
             String monthString = someBudget.Budgeted_Month__c;
             
@@ -174,11 +173,86 @@ public class MonthlyAccounting {
 			}
         }
     
-    	public static void accountForUpdatingMonthlyBudgets(List<Monthly_Budget__c> updatingMonthlyBudgets)
+    	public static void accountForUpdatingMonthlyBudgets(List<Monthly_Budget__c> outdatedMonthlyBudgets, List<Monthly_Budget__c> updatedMonthlyBudgets)
         {
+            List<Monthly_Budget__c> unaccountedBudgets = new List<Monthly_Budget__c>();
+            List<Monthly_Budget__c> allSubBudgets = new List<Monthly_Budget__c>([SELECT compositeBudget__c, Month_Value__c, YearValue__c, Recorded_Expenses__c  FROM Monthly_Budget__c WHERE NOT(budgetedExpense__c=:'Composite')]);
+            List<Monthly_Budget__c> allCompBudgets = new List<Monthly_Budget__c>([SELECT compositeBudget__c, Month_Value__c, YearValue__c, Recorded_Expenses__c  FROM Monthly_Budget__c WHERE budgetedExpense__c=:'Composite']);
             //for each update on composite monthly budget, update income on all subordinate 'expense' budgets.
             //
             //for each update on an 'expense' budget, update expenses on composite monthly budget.
+            for(integer i = 0; i < updatedMonthlyBudgets.Size(); i++)
+            {
+                if(updatedMonthlyBudgets[i].budgetedExpense__c == 'Composite')
+                {
+                    updatedMonthlyBudgets[i].Recorded_Expenses__c = 0;
+                    for(Monthly_Budget__c subBudget : allSubBudgets)
+                    {
+                        //If true, this subBudget belongs to the current composite budget.  So we must update it's recorded income and recalculate it's expenses.
+                        if(subBudget.YearValue__c == updatedMonthlyBudgets[i].YearValue__c && subBudget.Month_Value__c == updatedMonthlyBudgets[i].Month_Value__c)
+                        {
+                            subBudget.RecordedIncome__c = updatedMonthlyBudgets[i].RecordedIncome__c;
+                            updatedMonthlyBudgets[i].Recorded_Expenses__c += subBudget.Recorded_Expenses__c;
+                            //This segment checks to see if this still needs accounted for.
+                            boolean isAccountedFor = false;
+                            for(Monthly_Budget__c accountedBudget : updatedMonthlyBudgets)
+                            {
+                                if(accountedBudget.id == subBudget.id)
+                                {
+                                    isAccountedFor = true;
+                                    break;
+                                }
+                            }
+                            if(!isAccountedFor)
+                            {
+								unaccountedBudgets.add(subBudget);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    for(Monthly_Budget__c compBudget : allCompBudgets)
+                    {
+                        //If true, this compBudget is parent to the current composite budget(which is someBudget).
+                        if(compBudget.YearValue__c == updatedMonthlyBudgets[i].YearValue__c && compBudget.Month_Value__c == updatedMonthlyBudgets[i].Month_Value__c)
+                        {
+                            
+                            //Updates the appropriate field in the composite Budget to correspond with the expense total in the subordinate budget.
+                            switch on updatedMonthlyBudgets[i].budgetedExpense__c
+                            {
+                                when 'Auto' { compBudget.Auto__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Exercise' { compBudget.Exercise__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Food&Drinks' { compBudget.Food_Drinks__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Home' { compBudget.Home__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Insurance' { compBudget.Insurance__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Miscellaneous' { compBudget.Miscellaneous__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Recreation' { compBudget.Recreation__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Shopping' { compBudget.Shopping__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                                when 'Subscriptions' { compBudget.Subscriptions__c = updatedMonthlyBudgets[i].Recorded_Expenses__c; }
+                            }
+                            //This segment checks to see if this still needs accounted for.
+                            boolean isAccountedFor = false;
+                            for(Monthly_Budget__c accountedBudget : updatedMonthlyBudgets)
+                            {
+                                if(accountedBudget.id == compBudget.id)
+                                {
+                                    isAccountedFor = true;
+                                    break;
+                                }
+                            }
+                            if(!isAccountedFor)
+                            {
+								unaccountedBudgets.add(compBudget);
+                            }
+                            //The composite budget was found and acted on, so we can break out of this loop.
+                            break;
+                        }
+                    }
+                    
+                }
+            }
+            update unaccountedBudgets;
         }
     
     	public static void accountForDeletingMonthlyBudgets(List<Monthly_Budget__c> MonthlyBudgetToBeDeleted)

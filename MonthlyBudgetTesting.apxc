@@ -38,7 +38,7 @@ public class MonthlyBudgetTesting {
         Monthly_Budget__c userChainingBudgets = new Monthly_Budget__c();
         userChainingBudgets.Name = 'TestSubBudget ChainDefining - June 2021';
         userChainingBudgets.YearBudgeted__c = '2021';
-        userChainingBudgets.Budgeted_Month__c = '6';
+        userChainingBudgets.Budgeted_Month__c = 'June';
         userChainingBudgets.budgetedExpense__c = 'Food&Drinks';
         userChainingBudgets.OwnerId = userInfo.getUserId();
         userChainingBudgets.Recorded_Expenses__c = 0;
@@ -62,20 +62,6 @@ public class MonthlyBudgetTesting {
         noDateBudget.budgetedExpense__c = 'Composite';
         noDateBudget.OwnerId = userInfo.getUserId();
         noDateBudget.Recorded_Expenses__c = 0;
-        //Emulates an invalid Monthly Budget with an out-of-bounds date passed from a transaction.
-        Monthly_Budget__c outOfBoundsDateBudget = new Monthly_Budget__c();
-        outOfBoundsDateBudget.YearBudgeted__c = '3000';
-        outOfBoundsDateBudget.Budgeted_Month__c = '6';
-        outOfBoundsDateBudget.budgetedExpense__c = 'Composite';
-        outOfBoundsDateBudget.OwnerId = userInfo.getUserId();
-        outOfBoundsDateBudget.Recorded_Expenses__c = 0;
-        //Emulates an invalid Monthly Budget with an out-of-bounds date entered by a user.
-        Monthly_Budget__c UserOutOfBoundsDateBudget = new Monthly_Budget__c();
-        UserOutOfBoundsDateBudget.YearBudgeted__c = '3000';
-        UserOutOfBoundsDateBudget.Budgeted_Month__c = '6';
-        UserOutOfBoundsDateBudget.budgetedExpense__c = 'Composite';
-        UserOutOfBoundsDateBudget.OwnerId = userInfo.getUserId();
-        UserOutOfBoundsDateBudget.Recorded_Expenses__c = 0;
         //Attempts to create an identical budget out of a previously made budget (instantMonthlyBudget).
         Monthly_Budget__c duplicateBudget = new Monthly_Budget__c();
         duplicateBudget.YearValue__c = 2020;
@@ -91,8 +77,7 @@ public class MonthlyBudgetTesting {
         duplicateBudgetTwo.OwnerId = userInfo.getUserId();
         duplicateBudgetTwo.Recorded_Expenses__c = 0;
         //
-        invalidBudgets.add(outOfBoundsDateBudget);
-        invalidBudgets.add(UserOutOfBoundsDateBudget);
+        invalidBudgets.add(noDateBudget);
         invalidBudgets.add(duplicateBudget);
         invalidBudgets.add(duplicateBudgetTwo);
     }
@@ -102,20 +87,31 @@ public class MonthlyBudgetTesting {
     {
         BudgetTestSetup();
         List<Monthly_Budget__c> isolatedValidBudgets = new List<Monthly_Budget__c>();
+        boolean inDB = false;
         for(integer i = 0; i < validBudgets.size(); i++)
         {
             isolatedValidBudgets.clear();
             isolatedValidBudgets.add(validBudgets[i]);
             insert isolatedValidBudgets;
-            switch on i
+            List<Monthly_Budget__c> currentBudgets = new List<Monthly_Budget__c>([SELECT Budgeted_Month__c, YearBudgeted__c, YearValue__c, Month_Value__c, RecordedIncome__c, budgetedExpense__c, OwnerId, Id FROM Monthly_Budget__c]);
+            for(integer j = 0; j < currentBudgets.Size(); j++)
             {
-                when 0 { System.assert( true ); }
-                when 1 { System.assert( true ); }
-                when 2 { System.assert( true ); }
-                when 3 { System.assert( true ); }
-                when 4 { System.assert( true ); }
+                if( (currentBudgets[j].budgetedExpense__c == validBudgets[i].budgetedExpense__c) && (currentBudgets[j].YearValue__c == validBudgets[i].YearValue__c) && (currentBudgets[j].Month_Value__c == validBudgets[i].YearValue__c) )
+                {
+                   //then this budget was successfully entered into the database.
+                   inDB = true;
+                }
+                else if( (currentBudgets[j].YearValue__c == validBudgets[i].YearValue__c) && (currentBudgets[j].Month_Value__c == validBudgets[i].YearValue__c) )
+                {
+                    if(currentBudgets[j].budgetedExpense__c == 'Composite' && validBudgets[i].budgetedExpense__c == null)
+                    {
+                        //Checks for anonymous typed case.
+                        inDB = true;
+                    }
+                }
             }
-            
+        	//if we get out of the for loop without returning true, then it must be false.
+            System.assert(inDB);
         }
     }
     
@@ -128,7 +124,7 @@ public class MonthlyBudgetTesting {
         {
             isolatedInvalidBudgets.clear();
             isolatedInvalidBudgets.add(invalidBudgets[i]);
-            SYstem.debug('invalid budget: ' + invalidBudgets[i]);
+            System.debug('invalid budget: ' + invalidBudgets[i]);
             try{
                 insert isolatedInvalidBudgets;
             }catch(exception e)
@@ -137,10 +133,8 @@ public class MonthlyBudgetTesting {
                 switch on i
                 {
                     when 0 { System.assert( 'A Month or year value wes not chosen before trying to create the Budget.'.equals( e.getMessage() ) ); }
-                    when 1 { System.assert( 'Year or month values entered were invalid, please enter year between 2018-2026, and enter a real month 1-12.'.equals( e.getMessage() ) ); }
-                    when 2 { System.assert( 'Year or month values entered were invalid, please enter year between 2018-2026, and enter a real month 1-12.'.equals( e.getMessage() ) ); }
-                    when 3 { /*Nothing asserted here because it is a valid entry */ }
-                    when 4 { System.assert( 'This budget already exists.'.equals( e.getMessage() ) ); }
+                    when 1 { /*Nothing asserted here because it is a valid entry */ }
+                    when 2 { System.assert( 'This budget already exists.'.equals( e.getMessage() ) ); }
                 }
             }
         }

@@ -83,7 +83,7 @@ public class MonthlyAccounting {
                         Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
                         instantMonthlyBudget.YearValue__c = someBudget.YearValue__c;
                         instantMonthlyBudget.Month_Value__c = someBudget.Month_Value__c;
-                        instantMonthlyBudget.budgetedExpense__c = 'composite';
+                        instantMonthlyBudget.budgetedExpense__c = 'Composite';
                         instantMonthlyBudget.OwnerId = userInfo.getUserId();
                         instantMonthlyBudget.RecordedIncome__c = 0;
                         someBudget.CompositeBudget__c = instantMonthlyBudget.id;

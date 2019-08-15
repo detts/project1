@@ -38,7 +38,7 @@ public class ExpenseAccounting {
                         
                         if(!foundComposite)  //Checks if the budgeted month was not found/does not exist.  Creates a default composite and expense budgets if no budgets exists.
                         {
-                            /*
+                            
                                 Monthly_Budget__c instantMonthlyBudget = new Monthly_Budget__c();
                                 instantMonthlyBudget.YearValue__c = someExpense.YearValue__c;
                                 instantMonthlyBudget.Month_Value__c = someExpense.MonthValue__c;
@@ -49,9 +49,9 @@ public class ExpenseAccounting {
                             	instantMonthlyBudget.Name = instantMonthlyBudget.budgetedExpense__c + ' budget of ' + instantMonthlyBudget.Budgeted_Month__c + ' ' + instantMonthlyBudget.YearBudgeted__c;
                             	instantMonthlyBudget.Recorded_Expenses__c = someExpense.ExpenseAmount__c;
                                 Budgets.add(instantMonthlyBudget);
-                            */
+                            
                             	Monthly_Budget__c instantSubBudget = new Monthly_Budget__c();
-                            	//instantSubBudget.CompositeBudget__c = instantMonthlyBudget.id;
+                            	instantSubBudget.CompositeBudget__c = instantMonthlyBudget.id;
                                 instantSubBudget.YearValue__c = someExpense.YearValue__c;
                                 instantSubBudget.Month_Value__c = someExpense.MonthValue__c;
                             	MonthlyAccounting.setYearStringOnPicklistFromYearValue(instantSubBudget);
@@ -86,6 +86,8 @@ public class ExpenseAccounting {
                                            if( (someExpense.Expense_Types__c == Budgets[i].budgetedExpense__c) && (someExpense.YearValue__c == Budgets[i].YearValue__c) && (someExpense.MonthValue__c == Budgets[i].YearValue__c) )
                                            {
                                                //then the subBudget has already been accounted for.
+                                               establishTransactionAndBudgetLookup(someExpense, Budgets[i]);
+                                               Budgets[i].CompositeBudget__c = compositeBudget.Id;
                                                foundSubBudget = true;
                                                break;
                                             }
@@ -144,7 +146,7 @@ public class ExpenseAccounting {
                             }
                             else
                             {
-                                someIncome.addError('Invalid Income Amount Entry, must be an Income value in range $0.00 - $999999999.99');
+                                someExpense.addError('Invalid Income Amount Entry, must be an Income value in range $0.00 - $999999999.99');
                             }
                         }
                     }
@@ -159,6 +161,23 @@ public class ExpenseAccounting {
             {
                 someExpense.Related_Monthly_Budget__c = someBudget.id;
             }
+        }
+    
+    	public static void accountForAutoBudgetLookups(List<Expense_Transaction__c> newExpenseTransactions)
+        {
+			Id userId = userInfo.getUserId();
+            List<Monthly_Budget__c> compBudgets = new List<Monthly_Budget__c>([SELECT id, YearValue__c, Month_Value__c, RecordedIncome__c, Recorded_Expenses__c, budgetedExpense__c, OwnerId FROM Monthly_Budget__c WHERE ownerId =: userId AND budgetedExpense__c='Composite']);
+            for(Expense_Transaction__c someExpense : newExpenseTransactions)
+            {
+                for(Monthly_Budget__c compBudget : compBudgets)
+            	{
+                    if(someExpense.MonthValue__c == compBudget.Month_Value__c && someExpense.YearValue__c == compBudget.YearValue__c && someExpense.Related_Monthly_Budget__c == null)
+                    {
+                        establishTransactionAndBudgetLookup(someExpense, compBudget);
+                    }
+            	}
+            }
+            
         }
     
     	public static void accountForUpdatedExpenses(List<Expense_Transaction__c> previousExpenseTransactions, List<Expense_Transaction__c> updatingExpenseTransactions)
@@ -180,6 +199,7 @@ public class ExpenseAccounting {
                             {
                                //Accounts for the difference between the old and new amount within it's parent budget.
                                someBudget.Recorded_Expenses__c += (someExpense.ExpenseAmount__c - oldExpense.ExpenseAmount__c);
+                               someBudget.IncomeLessExpenses__c = (someBudget.RecordedIncome__c - someBudget.Recorded_Expenses__c);
                             }
                         }
                         

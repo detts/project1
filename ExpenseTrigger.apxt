@@ -4,28 +4,28 @@ trigger ExpenseTrigger on Expense_Transaction__c (before insert, before update) 
     {
         if(Trigger.isDelete)
     	{
-        
+        	ExpenseAccounting.accountForDeletedExpenseTransactions(Trigger.old);
     	}
     	else if(Trigger.isUpdate)
     	{
-        
+        	ExpenseAccounting.accountForUpdatedExpenses(Trigger.old, Trigger.new);
     	}
         else if(Trigger.isInsert)
         {
-			ExpenseAccounting.accountForNewExpenses(Trigger.new);
+		ExpenseAccounting.accountForNewExpenses(Trigger.new);
         }
     }
     else if(Trigger.isAfter)
     {
-        if(Trigger.isDelete)
+		if(Trigger.isInsert)
     	{
-        
+            ExpenseAccounting.accountForAutoBudgetLookups(Trigger.new);
     	}
     	else if(Trigger.isUpdate)
     	{
-        
+        	
     	}
-        else if(Trigger.isInsert)
+        else if(Trigger.isDelete)
         {
 			
         }

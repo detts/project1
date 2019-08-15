@@ -8,27 +8,26 @@ trigger IncomeTrigger on Income_Transaction__c (before insert, before update) {
     	}
     	else if(Trigger.isUpdate)
     	{
-        	
+        	IncomeAccounting.accountForChangedTransactions(Trigger.old, Trigger.new);
     	}
         else if(Trigger.isDelete)
         {
-			
+		IncomeAccounting.accountForDeletedIncomeTransactions(Trigger.old);
         }
     }
     else if(Trigger.isAfter)
     {
-        if(Trigger.isDelete)
+		if(Trigger.isInsert)
     	{
-        
+            	IncomeAccounting.accountForAutoBudgetLookups(Trigger.new);
     	}
     	else if(Trigger.isUpdate)
     	{
-        
+        	
     	}
-        else if(Trigger.isInsert)
+        else if(Trigger.isDelete)
         {
-			
+		IncomeAccounting.accountForDeletedIncomeTransactions(Trigger.old);
         }
     }
-    
 }

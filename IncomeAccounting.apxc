@@ -59,7 +59,6 @@ public class IncomeAccounting {
                                 if(transactionBudget.budgetedExpense__c == 'Composite')
                                 {
                                     establishTransactionAndBudgetLookup(someIncome, transactionBudget);
-                                    transactionBudget.RecordedIncome__c += someIncome.Income_Amount__c;
                                 }
                             }
                         }
@@ -78,6 +77,7 @@ public class IncomeAccounting {
                             if(someIncome.Income_Amount__c >= 0.00 && someIncome.Income_Amount__c <= 999999999.99)
                             {
                                 matchedBudgets[iter].RecordedIncome__c = ( matchedBudgets[iter].RecordedIncome__c + someIncome.Income_Amount__c);
+                                matchedBudgets[iter].IncomeLessExpenses__c = (matchedBudgets[iter].RecordedIncome__c - matchedBudgets[iter].Recorded_Expenses__c);
                                 establishTransactionAndBudgetLookup(someIncome, matchedBudgets[iter]);
                                 
                             }
@@ -106,7 +106,6 @@ public class IncomeAccounting {
                     }
             	}
             }
-            
         }
     	
         private static void establishTransactionAndBudgetLookup(Income_Transaction__c someIncome, Monthly_Budget__c someBudget)
@@ -140,6 +139,7 @@ public class IncomeAccounting {
                                 {
                                    //Accounts for the difference between the old and new amount within the composite budget.
                                    someBudget.RecordedIncome__c += diff;
+                                   someBudget.IncomeLessExpenses__c = (someBudget.RecordedIncome__c - someBudget.Recorded_Expenses__c);
                                 }
                             }
                         }
@@ -155,13 +155,15 @@ public class IncomeAccounting {
             List<Monthly_Budget__c> relatedBudgets = new List<Monthly_Budget__c>([SELECT RecordedIncome__c, YearValue__c, Month_Value__c, budgetedExpense__c FROM Monthly_Budget__c WHERE ownerId =: userId]);
             for(Income_Transaction__c someIncome : IncomeTransactionsToBeDeleted)
             {
+                Id incomeBudget = (someIncome.Monthly_Budget__c);
                   for(Monthly_Budget__c someBudget : relatedBudgets)
                   {
                      //Evaluates true only for the budget it is related to.
-                     if(someBudget.budgetedExpense__c == 'Composite' && someIncome.YearValue__c == someBudget.YearValue__c && someIncome.MonthValue__c == someBudget.Month_Value__c)
+                     if(incomeBudget == someBudget.id)
                      {
                         //Accounts for the loss of the old income within it's composite budget.
-                        someBudget.RecordedIncome__c -= someIncome.Income_Amount__c;
+                        someBudget.RecordedIncome__c = (someBudget.RecordedIncome__c - someIncome.Income_Amount__c);
+                        someBudget.IncomeLessExpenses__c = (someBudget.RecordedIncome__c - someBudget.Recorded_Expenses__c);
                       }
                   }
             }

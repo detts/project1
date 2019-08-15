@@ -1,4 +1,53 @@
 @isTest
 public class IncomeTesting {
 
+	static Monthly_Budget__c incomeBudget = new Monthly_Budget__c();
+	static Income_Transaction__c testIncome = new Income_Transaction__c();
+    
+    @testSetup
+	public static void IncomeTestSetup()
+    {
+        //Emulates a subordinate monthly budget defined by the system.
+        incomeBudget = new Monthly_Budget__c();
+        incomeBudget.Name = 'Composite Budget August 2019';
+        incomeBudget.YearValue__c = 2019;
+        incomeBudget.Month_Value__c = 8;
+        incomeBudget.YearBudgeted__c = '2019';
+        incomeBudget.Budgeted_Month__c = 'August';
+        incomeBudget.budgetedExpense__c = 'Composite';
+        incomeBudget.OwnerId = userInfo.getUserId();
+        incomeBudget.RecordedIncome__c = 0;
+        incomeBudget.Recorded_Expenses__c = 0;
+        
+        testIncome.Income_Amount__c = 500;
+        testIncome.IncomeSource__c = 'Miscellaneous';
+        testIncome.Monthly_Budget__c = incomeBudget.id;
+        testIncome.IncomeRecievedDate__c = Date.newInstance(2019, 8, 14);
+        testIncome.OwnerId = userInfo.getUserId();
+        
+    }
+    
+    @isTest
+    public static void IncomesTesting()
+    {
+        IncomeTestSetup();
+        //tests to make sure the Budget is updated after putting the Income into the system.
+        insert incomeBudget;
+        Monthly_Budget__c retrievedBudget = [SELECT RecordedIncome__c, Recorded_Expenses__c FROM Monthly_Budget__c LIMIT 1];
+        System.assertEquals(0, retrievedBudget.RecordedIncome__c);
+        //tests to ensure that after an income transaction is submitted, the field on it's monthly budget is updated properly.
+        insert testIncome;
+        retrievedBudget = [SELECT RecordedIncome__c, Recorded_Expenses__c FROM Monthly_Budget__c LIMIT 1];
+        System.assertEquals(500, retrievedBudget.RecordedIncome__c);
+        //
+        testIncome.Income_Amount__c = 300;
+        update testIncome;
+        retrievedBudget = [SELECT RecordedIncome__c, Recorded_Expenses__c FROM Monthly_Budget__c LIMIT 1];
+        System.assertEquals(300, retrievedBudget.RecordedIncome__c);
+        //
+        delete testIncome;
+        retrievedBudget = [SELECT RecordedIncome__c, Recorded_Expenses__c FROM Monthly_Budget__c LIMIT 1];
+        System.assertEquals(0, retrievedBudget.RecordedIncome__c);
+    }
+    
 }

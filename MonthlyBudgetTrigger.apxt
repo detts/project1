@@ -12,23 +12,22 @@ trigger MonthlyBudgetTrigger on Monthly_Budget__c (before insert, before update)
     	}
         else if(Trigger.isInsert)
         {
-			MonthlyAccounting.accountForNewMonth(Trigger.new);
+		MonthlyAccounting.accountForNewMonth(Trigger.new);
         }
     }
     else if(Trigger.isAfter)
     {
-        if(Trigger.isDelete)
+	if(Trigger.isInsert)
     	{
-        
+            
     	}
     	else if(Trigger.isUpdate)
     	{
-        
+        	MonthlyAccounting.accountForUpdatingMonthlyBudgets(Trigger.old, Trigger.new);
     	}
-        else if(Trigger.isInsert)
+        else if(Trigger.isDelete)
         {
 			
         }
     }
-    
 }
